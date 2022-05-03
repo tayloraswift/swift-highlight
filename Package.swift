@@ -5,13 +5,13 @@ let package = Package(
     name: "swift-highlight",
     products: 
     [
-        .library(name: "Highlight", targets: ["Highlight"]),
+        .library(name: "Notebook", targets: ["Notebook"]),
     ],
     dependencies: 
     [
     ],
     targets: 
     [
-        .target(name: "Highlight", path: "sources/highlight"),
+        .target(name: "Notebook", path: "sources/notebook"),
     ]
 )
