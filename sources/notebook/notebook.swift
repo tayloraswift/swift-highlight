@@ -284,3 +284,19 @@ struct Notebook<Color, Link>:Sequence where Color:RawRepresentable, Color.RawVal
         })
     }
 }
+extension Notebook where Link == Never 
+{
+    // always discards links 
+    @inlinable public 
+    init<Syntax>(_ syntax:Syntax) 
+        where   Syntax:Sequence, 
+                Syntax.Element:NotebookFragment, 
+                Syntax.Element.Color == Color
+    {
+        self.init(capacity: syntax.underestimatedCount)
+        for fragment:Syntax.Element in syntax
+        {
+            self.content.append(text: fragment.text, color: fragment.color)
+        }
+    }
+}
