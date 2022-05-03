@@ -1,9 +1,28 @@
 #if swift(>=5.5)
 extension NotebookStorage:Sendable {}
-extension NotebookContent:Sendable where Highlight:Sendable {}
-extension Notebook:Sendable where Highlight:Sendable, Link:Sendable {}
+extension NotebookContent:Sendable where Color:Sendable {}
+extension Notebook:Sendable where Color:Sendable, Link:Sendable {}
 #endif 
 
+public 
+protocol NotebookFragment 
+{
+    associatedtype Link
+    associatedtype Color where Color:RawRepresentable, Color.RawValue == UInt8
+    
+    var text:String 
+    {
+        get 
+    }
+    var link:Link? 
+    {
+        get
+    }
+    var color:Color 
+    {
+        get 
+    }
+}
 @frozen public 
 struct NotebookStorage
 {
@@ -17,13 +36,13 @@ struct NotebookStorage
     }
     
     @inlinable public
-    func load<Highlight>(element:UInt64, at index:inout Int) -> (text:String, highlight:Highlight)
-        where Highlight:RawRepresentable, Highlight.RawValue == UInt8
+    func load<Color>(element:UInt64, at index:inout Int) -> (text:String, color:Color)
+        where Color:RawRepresentable, Color.RawValue == UInt8
     {
         withUnsafeBytes(of: element)
         {
             let flags:UInt8 = $0[$0.endIndex - 1]
-            guard let highlight:Highlight = .init(rawValue: flags & 0b0111_1111)
+            guard let color:Color = .init(rawValue: flags & 0b0111_1111)
             else 
             {
                 fatalError("could not round-trip raw value '\(flags & 0b0111_1111)'")
@@ -31,7 +50,7 @@ struct NotebookStorage
             if  flags & 0b1000_0000 != 0 
             {
                 // inline UTF-8
-                return (String.init(decoding: $0.dropLast().prefix { $0 != 0 }, as: Unicode.UTF8.self), highlight)
+                return (String.init(decoding: $0.dropLast().prefix { $0 != 0 }, as: Unicode.UTF8.self), color)
             }
             else 
             {
@@ -39,13 +58,13 @@ struct NotebookStorage
                 let next:Int = Int.init($0.load(as: UInt32.self))
                 let utf8:ArraySlice<UInt8> = self.utf8[index ..< next]
                 index = next 
-                return (String.init(decoding: utf8, as: Unicode.UTF8.self), highlight)
+                return (String.init(decoding: utf8, as: Unicode.UTF8.self), color)
             }
         }
     }
     @inlinable public mutating 
-    func store<Highlight>(text:String, highlight:Highlight) -> UInt64
-        where Highlight:RawRepresentable, Highlight.RawValue == UInt8
+    func store<Color>(text:String, color:Color) -> UInt64
+        where Color:RawRepresentable, Color.RawValue == UInt8
     {
         var text:String = text
         return text.withUTF8 
@@ -57,13 +76,13 @@ struct NotebookStorage
                 if utf8.count < $0.count 
                 {
                     $0.copyBytes(from: utf8)
-                    $0[$0.endIndex - 1] = 0x80 | highlight.rawValue 
+                    $0[$0.endIndex - 1] = 0x80 | color.rawValue 
                 }
                 else 
                 {
                     self.utf8.append(contentsOf: utf8)
                     $0.storeBytes(of: UInt32.init(self.utf8.endIndex), as: UInt32.self)
-                    $0[$0.endIndex - 1] =        highlight.rawValue 
+                    $0[$0.endIndex - 1] =        color.rawValue 
                 }
             }
             return element
@@ -71,7 +90,7 @@ struct NotebookStorage
     }
 }
 @frozen public 
-struct NotebookContent<Highlight>:Sequence where Highlight:RawRepresentable, Highlight.RawValue == UInt8
+struct NotebookContent<Color>:Sequence where Color:RawRepresentable, Color.RawValue == UInt8
 {
     public 
     var storage:NotebookStorage
@@ -92,9 +111,9 @@ struct NotebookContent<Highlight>:Sequence where Highlight:RawRepresentable, Hig
     }
     
     @inlinable public mutating 
-    func append(text:String, highlight:Highlight)
+    func append(text:String, color:Color)
     {
-        self.elements.append(self.storage.store(text: text, highlight: highlight))
+        self.elements.append(self.storage.store(text: text, color: color))
     }
     
     @inlinable public
@@ -129,7 +148,7 @@ struct NotebookContent<Highlight>:Sequence where Highlight:RawRepresentable, Hig
         }
         
         @inlinable public mutating 
-        func next() -> (text:String, highlight:Highlight)?
+        func next() -> (text:String, color:Color)?
         {
             guard self.elementIndex < self.elements.endIndex 
             else 
@@ -144,7 +163,7 @@ struct NotebookContent<Highlight>:Sequence where Highlight:RawRepresentable, Hig
 }
 
 @frozen public 
-struct Notebook<Highlight, Link>:Sequence where Highlight:RawRepresentable, Highlight.RawValue == UInt8
+struct Notebook<Color, Link>:Sequence where Color:RawRepresentable, Color.RawValue == UInt8
 {
     @frozen public 
     struct Iterator:IteratorProtocol 
@@ -153,10 +172,10 @@ struct Notebook<Highlight, Link>:Sequence where Highlight:RawRepresentable, High
         var link:(index:Int, target:Link)?
         public 
         var links:Array<(index:Int, target:Link)>.Iterator, 
-            content:NotebookContent<Highlight>.Iterator 
+            content:NotebookContent<Color>.Iterator 
         
         @inlinable public 
-        init(_ content:NotebookContent<Highlight>, links:[(index:Int, target:Link)])
+        init(_ content:NotebookContent<Color>, links:[(index:Int, target:Link)])
         {
             self.content    = content.makeIterator() 
             self.links      = links.makeIterator()
@@ -164,10 +183,10 @@ struct Notebook<Highlight, Link>:Sequence where Highlight:RawRepresentable, High
         }
         
         @inlinable public mutating 
-        func next() -> (text:String, highlight:Highlight, link:Link?)?
+        func next() -> (text:String, color:Color, link:Link?)?
         {
             let current:Int = self.content.elementIndex
-            guard let (text, highlight):(String, Highlight) = self.content.next() 
+            guard let (text, color):(String, Color) = self.content.next() 
             else 
             {
                 return nil 
@@ -175,17 +194,17 @@ struct Notebook<Highlight, Link>:Sequence where Highlight:RawRepresentable, High
             if let (index, target):(Int, Link) = self.link, index == current 
             {
                 self.link = self.links.next()
-                return (text, highlight, target)
+                return (text, color, target)
             }
             else 
             {
-                return (text, highlight, nil)
+                return (text, color, nil)
             }
         }
     }
     
     public 
-    var content:NotebookContent<Highlight>
+    var content:NotebookContent<Color>
     public 
     var links:[(index:Int, target:Link)]
     
@@ -207,37 +226,42 @@ struct Notebook<Highlight, Link>:Sequence where Highlight:RawRepresentable, High
         self.init(content: .init(capacity: capacity), links: [])
     }
     @inlinable public 
-    init(content:NotebookContent<Highlight>, links:[(index:Int, target:Link)])
+    init(content:NotebookContent<Color>, links:[(index:Int, target:Link)])
     {
         self.content    = content 
         self.links      = links
     }
 
     @inlinable public 
-    init<S>(_ segments:S) where S:Sequence, S.Element == (String, Highlight, Link?)
+    init<Syntax>(_ syntax:Syntax) 
+        where   Syntax:Sequence, 
+                Syntax.Element:NotebookFragment, 
+                Syntax.Element.Color == Color,
+                Syntax.Element.Link == Link
     {
-        self.init(capacity: segments.underestimatedCount)
-        for (text, highlight, link):(String, Highlight, Link?) in segments
+        self.init(capacity: syntax.underestimatedCount)
+        for fragment:Syntax.Element in syntax
         {
-            if let link:Link = link 
+            if let link:Link = fragment.link 
             {
                 self.links.append((self.content.elements.endIndex, link))
             }
-            self.content.append(text: text, highlight: highlight)
+            self.content.append(text: fragment.text, color: fragment.color)
         }
     }
     @inlinable public 
-    init<S>(_ segments:S) where S:Sequence, S.Element == (String, Highlight)
+    init<Syntax>(_ syntax:Syntax) 
+        where Syntax:Sequence, Syntax.Element == (String, Color)
     {
-        self.init(capacity: segments.underestimatedCount)
-        for (text, highlight):(String, Highlight) in segments
+        self.init(capacity: syntax.underestimatedCount)
+        for (text, color):(String, Color) in syntax
         {
-            self.content.append(text: text, highlight: highlight)
+            self.content.append(text: text, color: color)
         }
     }
     
     @inlinable public 
-    func mapLinks<T>(_ transform:(Link) throws -> T) rethrows -> Notebook<Highlight, T>
+    func map<T>(_ transform:(Link) throws -> T) rethrows -> Notebook<Color, T>
     {
         .init(content: self.content, links: try self.links.map
         {
@@ -245,7 +269,7 @@ struct Notebook<Highlight, Link>:Sequence where Highlight:RawRepresentable, High
         })
     }
     @inlinable public 
-    func compactMapLinks<T>(_ transform:(Link) throws -> T?) rethrows -> Notebook<Highlight, T>
+    func compactMap<T>(_ transform:(Link) throws -> T?) rethrows -> Notebook<Color, T>
     {
         .init(content: self.content, links: try self.links.compactMap
         {
