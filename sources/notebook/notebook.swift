@@ -24,7 +24,7 @@ protocol NotebookFragment
     }
 }
 @frozen public 
-struct NotebookStorage
+struct NotebookStorage:Equatable
 {
     public 
     var utf8:[UInt8]
@@ -90,7 +90,8 @@ struct NotebookStorage
     }
 }
 @frozen public 
-struct NotebookContent<Color>:Sequence where Color:RawRepresentable, Color.RawValue == UInt8
+struct NotebookContent<Color>:Sequence, Equatable 
+    where Color:RawRepresentable, Color.RawValue == UInt8
 {
     public 
     var storage:NotebookStorage
@@ -298,5 +299,23 @@ extension Notebook where Link == Never
         {
             self.content.append(text: fragment.text, color: fragment.color)
         }
+    }
+}
+extension Notebook:Equatable where Link:Equatable
+{
+    @inlinable public static 
+    func == (lhs:Self, rhs:Self) -> Bool 
+    {
+        guard lhs.content == rhs.content, lhs.links.count == rhs.links.count
+        else 
+        {
+            return false 
+        }
+        for (lhs, rhs):((Int, Link), (Int, Link)) in zip(lhs.links, rhs.links)
+            where lhs != rhs
+        {
+            return false 
+        }
+        return true
     }
 }
