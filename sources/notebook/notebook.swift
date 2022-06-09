@@ -4,25 +4,6 @@ extension NotebookContent:Sendable where Color:Sendable {}
 extension Notebook:Sendable where Color:Sendable, Link:Sendable {}
 #endif 
 
-public 
-protocol NotebookFragment 
-{
-    associatedtype Link
-    associatedtype Color where Color:RawRepresentable, Color.RawValue == UInt8
-    
-    var text:String 
-    {
-        get 
-    }
-    var link:Link? 
-    {
-        get
-    }
-    var color:Color 
-    {
-        get 
-    }
-}
 @frozen public 
 struct NotebookStorage:Equatable
 {
@@ -167,6 +148,25 @@ struct NotebookContent<Color>:Sequence, Equatable
 struct Notebook<Color, Link>:Sequence where Color:RawRepresentable, Color.RawValue == UInt8
 {
     @frozen public 
+    struct Fragment 
+    {
+        public
+        var text:String
+        public
+        var link:Link?
+        public
+        var color:Color
+        
+        @inlinable public
+        init(_ text:String, color:Color, link:Link? = nil)
+        {
+            self.text = text 
+            self.color = color 
+            self.link = link
+        }
+    }
+    
+    @frozen public 
     struct Iterator:IteratorProtocol 
     {
         public 
@@ -184,7 +184,7 @@ struct Notebook<Color, Link>:Sequence where Color:RawRepresentable, Color.RawVal
         }
         
         @inlinable public mutating 
-        func next() -> (text:String, color:Color, link:Link?)?
+        func next() -> Fragment?
         {
             let current:Int = self.content.elementIndex
             guard let (text, color):(String, Color) = self.content.next() 
@@ -195,11 +195,11 @@ struct Notebook<Color, Link>:Sequence where Color:RawRepresentable, Color.RawVal
             if let (index, target):(Int, Link) = self.link, index == current 
             {
                 self.link = self.links.next()
-                return (text, color, target)
+                return .init(text, color: color, link: target)
             }
             else 
             {
-                return (text, color, nil)
+                return .init(text, color: color)
             }
         }
     }
@@ -234,14 +234,11 @@ struct Notebook<Color, Link>:Sequence where Color:RawRepresentable, Color.RawVal
     }
 
     @inlinable public 
-    init<Syntax>(_ syntax:Syntax) 
-        where   Syntax:Sequence, 
-                Syntax.Element:NotebookFragment, 
-                Syntax.Element.Color == Color,
-                Syntax.Element.Link == Link
+    init<Fragments>(_ fragments:Fragments) 
+        where Fragments:Sequence, Fragments.Element == Fragment
     {
-        self.init(capacity: syntax.underestimatedCount)
-        for fragment:Syntax.Element in syntax
+        self.init(capacity: fragments.underestimatedCount)
+        for fragment:Fragment in fragments
         {
             if let link:Link = fragment.link 
             {
@@ -289,13 +286,11 @@ extension Notebook where Link == Never
 {
     // always discards links 
     @inlinable public 
-    init<Syntax>(_ syntax:Syntax) 
-        where   Syntax:Sequence, 
-                Syntax.Element:NotebookFragment, 
-                Syntax.Element.Color == Color
+    init<Fragments, Discard>(_ fragments:Fragments) 
+        where Fragments:Sequence, Fragments.Element == Notebook<Color, Discard>.Element
     {
-        self.init(capacity: syntax.underestimatedCount)
-        for fragment:Syntax.Element in syntax
+        self.init(capacity: fragments.underestimatedCount)
+        for fragment:Notebook<Color, Discard>.Element in fragments
         {
             self.content.append(text: fragment.text, color: fragment.color)
         }
