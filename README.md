@@ -1,6 +1,6 @@
 <div align="center">
   
-***`highlight`***<br>`0.1.2`
+***`highlight`***<br>`0.1.3`
 
 </div>
 
@@ -10,6 +10,6 @@
 
 * `struct NotebookStorage`
 
-* `struct NotebookContent<Highlight>`
+* `struct NotebookContent<Color>`
 
-* `struct Notebook<Highlight, Link>`
+* `struct Notebook<Color, Link>`
