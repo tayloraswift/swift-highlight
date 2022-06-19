@@ -1,6 +1,6 @@
 <div align="center">
   
-***`highlight`***<br>`0.1.3`
+***`highlight`***<br>`0.1.4`
 
 </div>
 

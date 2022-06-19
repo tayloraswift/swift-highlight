@@ -145,7 +145,8 @@ struct NotebookContent<Color>:Sequence, Equatable
 }
 
 @frozen public 
-struct Notebook<Color, Link>:Sequence where Color:RawRepresentable, Color.RawValue == UInt8
+struct Notebook<Color, Link>:Sequence 
+    where Color:RawRepresentable, Color.RawValue == UInt8
 {
     @frozen public 
     struct Fragment 
@@ -222,6 +223,11 @@ struct Notebook<Color, Link>:Sequence where Color:RawRepresentable, Color.RawVal
     }
     
     @inlinable public 
+    init()
+    {
+        self.init(content: .init(), links: [])
+    }
+    @inlinable public 
     init(capacity:Int)
     {
         self.init(content: .init(capacity: capacity), links: [])
@@ -232,21 +238,7 @@ struct Notebook<Color, Link>:Sequence where Color:RawRepresentable, Color.RawVal
         self.content    = content 
         self.links      = links
     }
-
-    @inlinable public 
-    init<Fragments>(_ fragments:Fragments) 
-        where Fragments:Sequence, Fragments.Element == Fragment
-    {
-        self.init(capacity: fragments.underestimatedCount)
-        for fragment:Fragment in fragments
-        {
-            if let link:Link = fragment.link 
-            {
-                self.links.append((self.content.elements.endIndex, link))
-            }
-            self.content.append(text: fragment.text, color: fragment.color)
-        }
-    }
+    
     @inlinable public 
     init<Syntax>(_ syntax:Syntax) 
         where Syntax:Sequence, Syntax.Element == (String, Color)
@@ -256,6 +248,27 @@ struct Notebook<Color, Link>:Sequence where Color:RawRepresentable, Color.RawVal
         {
             self.content.append(text: text, color: color)
         }
+    }
+
+    @inlinable public 
+    init<Fragments>(_ fragments:Fragments) 
+        where Fragments:Sequence, Fragments.Element == Fragment
+    {
+        self.init(capacity: fragments.underestimatedCount)
+        for fragment:Fragment in fragments 
+        {
+            self.append(fragment)
+        }
+    }
+    
+    @inlinable public mutating 
+    func append(_ fragment:Fragment)
+    {
+        if let link:Link = fragment.link 
+        {
+            self.links.append((self.content.elements.endIndex, link))
+        }
+        self.content.append(text: fragment.text, color: fragment.color)
     }
     
     @inlinable public 
